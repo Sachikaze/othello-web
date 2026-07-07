@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#087346">
+  <title>オセロ Web版</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section id="menu-screen" class="screen menu-screen" aria-labelledby="title">
+      <div class="menu-card">
+        <p class="version">WEB VERSION 1.2 ONLINE</p>
+        <h1 id="title">オセロ</h1>
+        <p class="lead">URLを開くだけで遊べるブラウザ版です。</p>
+        <div class="menu-actions">
+          <button id="single-button" class="primary">シングルプレイ</button>
+          <button id="multi-button">マルチプレイ</button>
+          <button id="online-button">オンライン対戦</button>
+          <button id="help-button" class="ghost">遊び方</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="game-screen" class="screen game-screen hidden" aria-live="polite">
+      <header class="game-header">
+        <div>
+          <p id="mode-label" class="mode-label"></p>
+          <h2 id="turn-label">黒の番です</h2>
+        </div>
+        <div id="stone-count" class="stone-count">黒：2個　白：2個</div>
+      </header>
+
+      <div class="status-area">
+        <p id="message-label">置くマスを選んでください</p>
+        <p id="pass-label" class="pass-label" aria-live="assertive"></p>
+      </div>
+
+      <div class="options" aria-label="設定">
+        <label><input id="valid-moves-checkbox" type="checkbox" checked> 置けるマスを表示</label>
+        <label><input id="sound-checkbox" type="checkbox" checked> 効果音</label>
+      </div>
+
+      <div class="board-wrap">
+        <div id="board" class="board" role="grid" aria-label="オセロ盤"></div>
+      </div>
+
+      <div class="controls">
+        <button id="undo-button" disabled>取り消す（Esc）</button>
+        <button id="new-game-button" class="hidden">新しいゲーム（N）</button>
+        <button id="menu-button">スタート画面へ戻る（Z）</button>
+      </div>
+    </section>
+  </main>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <div class="modal-card">
+      <h2 id="modal-title"></h2>
+      <p id="modal-message"></p>
+      <div id="modal-input-area" class="modal-input-area hidden"></div>
+      <div id="modal-options" class="modal-options"></div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
