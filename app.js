@@ -1,11 +1,5 @@
 "use strict";
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
-import {
-  getDatabase, ref, set, get, onValue, off, runTransaction,
-  update, onDisconnect, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js";
-
 const firebaseConfig = {
   apiKey: "AIzaSyBWBbDvDSkLr8ojm-Dr2rWfvqV2Gvsi-Ok",
   authDomain: "othello-online-c9697.firebaseapp.com",
@@ -16,9 +10,46 @@ const firebaseConfig = {
   appId: "1:261503404565:web:1860206f1db8300715dc1c"
 };
 
-const firebaseApp = initializeApp(firebaseConfig);
-const database = getDatabase(firebaseApp);
+// Firebaseはオンライン対戦を選んだ時だけ読み込みます。
+// CDNの読み込みに失敗しても、シングル・マルチプレイは影響を受けません。
+let database = null;
+let ref = null;
+let set = null;
+let get = null;
+let onValue = null;
+let runTransaction = null;
+let update = null;
+let onDisconnect = null;
+let serverTimestamp = null;
+let firebaseReadyPromise = null;
 
+function ensureFirebase() {
+  if (database) return Promise.resolve(database);
+  if (firebaseReadyPromise) return firebaseReadyPromise;
+
+  firebaseReadyPromise = Promise.all([
+    import("https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js"),
+    import("https://www.gstatic.com/firebasejs/12.15.0/firebase-database.js")
+  ]).then(([appModule, databaseModule]) => {
+    const firebaseApp = appModule.initializeApp(firebaseConfig);
+    database = databaseModule.getDatabase(firebaseApp);
+    ref = databaseModule.ref;
+    set = databaseModule.set;
+    get = databaseModule.get;
+    onValue = databaseModule.onValue;
+    runTransaction = databaseModule.runTransaction;
+    update = databaseModule.update;
+    onDisconnect = databaseModule.onDisconnect;
+    serverTimestamp = databaseModule.serverTimestamp;
+    return database;
+  }).catch(error => {
+    firebaseReadyPromise = null;
+    console.error("Firebase SDKの読み込みに失敗しました", error);
+    throw new Error("オンライン対戦用のFirebaseを読み込めませんでした。通信状態を確認して、ページを再読み込みしてください。");
+  });
+
+  return firebaseReadyPromise;
+}
 
 const EMPTY = 0;
 const BLACK = 1;
@@ -528,6 +559,7 @@ class OthelloApp {
 
   async createOnlineRoom() {
     try {
+      await ensureFirebase();
       this.messageLabel.textContent = "ルームを作成しています...";
       let roomId;
       for (let attempt = 0; attempt < 10; attempt++) {
@@ -555,14 +587,10 @@ class OthelloApp {
       await this.enterOnlineRoom(roomId, BLACK);
       const invite = this.roomUrl(roomId);
       const copied = await this.copyText(invite);
-      await this.showAlert(
-        "ルームを作成しました",
-        `ルーム番号：${roomId}
-
-相手の参加を待っています。${copied ? "
-招待URLをクリップボードへコピーしました。" : "
-招待URL：" + invite}`
-      );
+      const inviteMessage = copied
+        ? `ルーム番号：${roomId}\n\n相手の参加を待っています。\n招待URLをクリップボードへコピーしました。`
+        : `ルーム番号：${roomId}\n\n相手の参加を待っています。\n招待URL：${invite}`;
+      await this.showAlert("ルームを作成しました", inviteMessage);
     } catch (error) {
       console.error(error);
       await this.showAlert("ルーム作成エラー", this.firebaseErrorMessage(error));
@@ -571,8 +599,9 @@ class OthelloApp {
 
   async joinOnlineRoom(roomId) {
     roomId = roomId.trim().toUpperCase();
-    const roomReference = ref(database, `rooms/${roomId}`);
     try {
+      await ensureFirebase();
+      const roomReference = ref(database, `rooms/${roomId}`);
       const result = await runTransaction(roomReference, room => {
         if (!room || room.status === "finished") return;
         room.players = room.players || {};
