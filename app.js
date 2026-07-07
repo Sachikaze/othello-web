@@ -485,10 +485,9 @@ class OthelloApp {
   }
 
   generateRoomId() {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-    const values = new Uint32Array(6);
+    const values = new Uint32Array(1);
     crypto.getRandomValues(values);
-    return Array.from(values, value => chars[value % chars.length]).join("");
+    return String(values[0] % 1000000).padStart(6, "0");
   }
 
   roomUrl(roomId) {
@@ -557,8 +556,8 @@ class OthelloApp {
     if (action === "join") {
       const roomId = await this.showTextInput(
         "ルームに入る",
-        "6文字のルーム番号を入力してください",
-        "例：AB12CD"
+        "6桁のルーム番号を入力してください",
+        "例：123456"
       );
       if (roomId) return this.joinOnlineRoom(roomId);
     }
@@ -605,29 +604,47 @@ class OthelloApp {
   }
 
   async joinOnlineRoom(roomId) {
-    roomId = roomId.trim().toUpperCase();
+    roomId = roomId.trim();
     try {
+      if (!/^\d{6}$/.test(roomId)) {
+        throw new Error("ルーム番号は6桁の数字で入力してください");
+      }
+
       await ensureFirebase();
       const roomReference = ref(database, `rooms/${roomId}`);
-      const result = await runTransaction(roomReference, room => {
-        if (!room || room.status === "finished") return;
-        room.players = room.players || {};
-        if (room.players.white && room.players.white.token !== this.playerToken) return;
-        room.players.white = {
+      const roomSnapshot = await get(roomReference);
+      if (!roomSnapshot.exists()) {
+        throw new Error("指定されたルームが見つかりません");
+      }
+
+      const room = roomSnapshot.val();
+      if (room.status === "finished") {
+        throw new Error("このルームの対局は終了しています");
+      }
+      if (!room.players || !room.players.black) {
+        throw new Error("このルームは正しく作成されていません");
+      }
+
+      // 白側の参加枠だけをトランザクションで確保する。
+      // 黒側（作成者）が存在することを満室とは判定せず、3人目だけを拒否する。
+      const whiteReference = ref(database, `rooms/${roomId}/players/white`);
+      const result = await runTransaction(whiteReference, currentWhite => {
+        if (currentWhite && currentWhite.token !== this.playerToken) return;
+        return {
           token: this.playerToken,
           connected: true,
-          joinedAt: Date.now()
+          joinedAt: currentWhite?.joinedAt || Date.now()
         };
-        room.status = "playing";
-        room.updatedAt = Date.now();
-        return room;
       }, { applyLocally: false });
 
       if (!result.committed) {
-        const snapshot = await get(roomReference);
-        if (!snapshot.exists()) throw new Error("指定されたルームが見つかりません");
         throw new Error("このルームにはすでに2人参加しています");
       }
+
+      await update(roomReference, {
+        status: "playing",
+        updatedAt: serverTimestamp()
+      });
       await this.enterOnlineRoom(roomId, WHITE);
     } catch (error) {
       console.error(error);
@@ -1083,6 +1100,8 @@ class OthelloApp {
 
     const input = document.createElement("input");
     input.type = "text";
+    input.inputMode = "numeric";
+    input.pattern = "[0-9]{6}";
     input.maxLength = 6;
     input.placeholder = placeholder;
     input.autocomplete = "off";
@@ -1108,9 +1127,9 @@ class OthelloApp {
       };
 
       const submitRoom = () => {
-        const value = input.value.trim().toUpperCase();
-        if (!/^[A-Z0-9]{6}$/.test(value)) {
-          input.setCustomValidity("英数字6文字で入力してください");
+        const value = input.value.trim();
+        if (!/^\d{6}$/.test(value)) {
+          input.setCustomValidity("6桁の数字で入力してください");
           input.reportValidity();
           return;
         }
@@ -1152,8 +1171,8 @@ function startApplication() {
     const appInstance = new OthelloApp();
     window.othelloApp = appInstance;
     const invitedRoom = new URLSearchParams(window.location.search).get("room");
-    if (invitedRoom && /^[A-Z0-9]{6}$/i.test(invitedRoom)) {
-      window.setTimeout(() => appInstance.joinOnlineRoom(invitedRoom.toUpperCase()), 100);
+    if (invitedRoom && /^\d{6}$/.test(invitedRoom)) {
+      window.setTimeout(() => appInstance.joinOnlineRoom(invitedRoom), 100);
     }
   } catch (error) {
     showStartupError(error);
