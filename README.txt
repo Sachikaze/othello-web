@@ -22,6 +22,15 @@ index.html をダブルクリックしてください。
 ・再戦、メニュー復帰
 ・スマートフォン向けレスポンシブ表示
 
+【GitHub Pagesで公開する流れ】
+1. GitHubのアカウントを作る
+2. 新しいPublicリポジトリを作る（例：othello-web）
+3. このフォルダー内の index.html、style.css、app.js、sounds フォルダーをアップロードする
+4. リポジトリの Settings → Pages を開く
+5. Sourceを Deploy from a branch にする
+6. Branchを main、フォルダーを /(root) にして Save
+7. 数分後に表示されるURLを開く
+
 【操作】
 シングル：マウス、または矢印キー＋Enter
 マルチ：黒＝マウス、白＝矢印キー＋Enter
