@@ -469,12 +469,19 @@ class OthelloApp {
 
   getOrCreatePlayerToken() {
     const key = "othello-online-player-token";
-    let token = sessionStorage.getItem(key);
-    if (!token) {
-      token = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
-      sessionStorage.setItem(key, token);
+    try {
+      let token = window.sessionStorage.getItem(key);
+      if (!token) {
+        token = window.crypto?.randomUUID
+          ? window.crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        window.sessionStorage.setItem(key, token);
+      }
+      return token;
+    } catch (error) {
+      console.warn("セッション保存を利用できないため、一時IDを使用します", error);
+      return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
     }
-    return token;
   }
 
   generateRoomId() {
@@ -1121,8 +1128,40 @@ class OthelloApp {
   }
 }
 
-const appInstance = new OthelloApp();
-const invitedRoom = new URLSearchParams(window.location.search).get("room");
-if (invitedRoom && /^[A-Z0-9]{6}$/i.test(invitedRoom)) {
-  window.setTimeout(() => appInstance.joinOnlineRoom(invitedRoom.toUpperCase()), 100);
+function showStartupError(error) {
+  console.error("オセロの起動に失敗しました", error);
+  const message = document.querySelector("#modal-message");
+  const title = document.querySelector("#modal-title");
+  const options = document.querySelector("#modal-options");
+  const modal = document.querySelector("#modal");
+  if (message && title && options && modal) {
+    title.textContent = "起動エラー";
+    message.textContent = `JavaScriptの起動に失敗しました。\n${error?.message || error}`;
+    options.innerHTML = "";
+    const reload = document.createElement("button");
+    reload.textContent = "再読み込み";
+    reload.classList.add("primary");
+    reload.addEventListener("click", () => window.location.reload());
+    options.append(reload);
+    modal.classList.remove("hidden");
+  }
+}
+
+function startApplication() {
+  try {
+    const appInstance = new OthelloApp();
+    window.othelloApp = appInstance;
+    const invitedRoom = new URLSearchParams(window.location.search).get("room");
+    if (invitedRoom && /^[A-Z0-9]{6}$/i.test(invitedRoom)) {
+      window.setTimeout(() => appInstance.joinOnlineRoom(invitedRoom.toUpperCase()), 100);
+    }
+  } catch (error) {
+    showStartupError(error);
+  }
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", startApplication, { once: true });
+} else {
+  startApplication();
 }
